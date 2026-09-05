@@ -43,7 +43,12 @@ python3 -m py_compile plugins/notify-lametric.py
 
 The tests do not contact Pushover or a LaMetric device.
 
+## Security note
+
+Pushover is contacted over HTTPS. LaMetric's local device API uses HTTP with
+Basic authentication, as specified by LaMetric. Keep the device API on a
+trusted management LAN and never expose port 8080 to an untrusted network.
+
 ## License
 
 Copyright 2026 Stijn Jonker. Licensed under GPL-3.0-or-later. See `LICENSE`.
-
