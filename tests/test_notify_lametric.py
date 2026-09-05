@@ -34,7 +34,24 @@ class LaMetricTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             module.in_silent_window("25:9", dt.datetime.now())
 
+    def test_builds_safe_ipv4_hostname_and_ipv6_endpoints(self) -> None:
+        self.assertEqual(
+            module.notification_endpoint("192.0.2.10"),
+            "http://192.0.2.10:8080/api/v2/device/notifications",
+        )
+        self.assertEqual(
+            module.notification_endpoint("clock.example.org"),
+            "http://clock.example.org:8080/api/v2/device/notifications",
+        )
+        self.assertEqual(
+            module.notification_endpoint("2001:db8::10"),
+            "http://[2001:db8::10]:8080/api/v2/device/notifications",
+        )
+
+    def test_rejects_url_injection_as_host(self) -> None:
+        with self.assertRaises(ValueError):
+            module.notification_endpoint("clock.example.org/path")
+
 
 if __name__ == "__main__":
     unittest.main()
-
