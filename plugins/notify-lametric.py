@@ -8,9 +8,11 @@ from __future__ import annotations
 import argparse
 import base64
 import datetime as dt
+import ipaddress
 import json
 import os
 from pathlib import Path
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -29,6 +31,7 @@ LEVELS = {
     "UNKNOWN": ("1396", "negative3"),
 }
 DEFAULT_LEVEL = ("555", "negative2")
+HOST_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 
 
 def parse_hour(value: str) -> int:
@@ -73,6 +76,20 @@ def read_config(path: Path) -> dict[str, str]:
             value = value[1:-1]
         values[key.strip()] = value
     return values
+
+
+def notification_endpoint(host: str) -> str:
+    value = host.strip()
+    try:
+        address = ipaddress.ip_address(value)
+    except ValueError:
+        labels = value.rstrip(".").split(".")
+        if len(value) > 253 or not labels or not all(HOST_LABEL.fullmatch(label) for label in labels):
+            raise ValueError("LaMetric host must be an IP address or DNS hostname")
+        authority = value.rstrip(".")
+    else:
+        authority = f"[{address}]" if address.version == 6 else str(address)
+    return f"http://{authority}:8080/api/v2/device/notifications"
 
 
 def values_from_environment(kind: str) -> tuple[str, str, str]:
@@ -131,6 +148,7 @@ def main() -> int:
             return 0
         if len(args.message) > MAX_MESSAGE_LENGTH:
             raise ValueError(f"message exceeds {MAX_MESSAGE_LENGTH} characters")
+        endpoint = notification_endpoint(args.host)
     except ValueError as exc:
         print(f"LaMetric notification configuration error: {exc}", file=sys.stderr)
         return 2
@@ -146,7 +164,7 @@ def main() -> int:
     }
     credentials = base64.b64encode(f"dev:{guid}".encode()).decode()
     request = urllib.request.Request(
-        f"http://{args.host}:8080/api/v2/device/notifications",
+        endpoint,
         data=json.dumps(payload, ensure_ascii=False).encode(),
         headers={"Authorization": f"Basic {credentials}", "Content-Type": "application/json"},
         method="POST",
